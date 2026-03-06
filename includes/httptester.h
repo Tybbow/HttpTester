@@ -20,6 +20,10 @@
 #include <arpa/inet.h>
 #include <float.h>
 
+// OpenSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 typedef struct  s_stats     t_stats;
 typedef struct  options     t_opts;
 
@@ -45,6 +49,7 @@ struct      options
     int     port;
     double  interval;
     int     help;
+    int     ssl;        // 1 = HTTPS activé (flag -ssl ou port 443)
 };
 
 extern t_stats		stats;
@@ -54,6 +59,7 @@ void        handler(int sig);
 size_t      intlen(int value);
 char        *createRequest(t_opts *opts);
 size_t      request(t_opts *opts);
+size_t      request_ssl(t_opts *opts);
 void        launch(t_opts *opts);
 void        initStats(char *dst);
 t_opts      *initOpts();
@@ -63,4 +69,5 @@ char        *copyRequest(t_opts *opts, char *tmp);
 char        *createRequest(t_opts *opts);
 int         checkOpts(t_opts *opts);
 int         usage();
+
 #endif

@@ -27,6 +27,7 @@ t_opts  *initOpts()
     opts->count = 4;
     opts->interval = 1;
     opts->help = 0;
+    opts->ssl = 0;
     return (opts);
 }
 
@@ -55,8 +56,13 @@ void    getOpts(int ac, char **av, t_opts **opts)
             (*opts)->interval = atof(av[i + 1]);
         if (!strcmp(av[i], "-h"))
             (*opts)->help = 1;
+        if (!strcmp(av[i], "-ssl"))
+            (*opts)->ssl = 1;
         i++;
     }
+
+    if ((*opts)->port == 443 && !(*opts)->ssl)
+        (*opts)->ssl = 1;
 }
 
 size_t  lengthRequest(t_opts *opts)
@@ -102,6 +108,7 @@ char    *itoa(int value)
         ret[size_ret] = '-';
     return (ret);
 }
+
 char    *copyRequest(t_opts *opts, char *tmp)
 {
     char    *bufContent;
@@ -121,7 +128,6 @@ char    *copyRequest(t_opts *opts, char *tmp)
         return (tmp);
     }
     strcat(tmp, "\r\n\r\n");
-    //free(bufContent);
     return (tmp);
 }
 
