@@ -1,11 +1,12 @@
-# 🌐 HTTPTester
+#🌐 HTTPTester
 
-> **HTTP-based ping tool — measure response time of HTTP requests, like ping but at the application layer.**
+> **HTTP/HTTPS-based ping tool — measure response time of HTTP requests, like ping but at the application layer.**
 
 ![Language](https://img.shields.io/badge/language-C-blue?style=flat-square)
 ![Version](https://img.shields.io/badge/version-1.1-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat-square)
-![Protocol](https://img.shields.io/badge/protocol-HTTP%2F1.1-orange?style=flat-square)
+![Protocol](https://img.shields.io/badge/protocol-HTTP%20%7C%20HTTPS-orange?style=flat-square)
+![OpenSSL](https://img.shields.io/badge/OpenSSL-libssl--dev-red?style=flat-square)
 
 ---
 
@@ -13,9 +14,9 @@
 
 **HTTPTester** is a lightweight C tool that behaves like `ping`, but at the **HTTP application layer**.
 
-Instead of ICMP or TCP SYN packets, it sends real **HTTP/1.1 requests** (GET, POST, HEAD, etc.) to a target server and measures the **round-trip time (RTT)** for each response — including the full TCP connect, HTTP send, and response receive cycle. It also displays the **real HTTP status code** returned by the server.
+Instead of ICMP or TCP SYN packets, it sends real **HTTP/1.1 requests** (GET, POST, HEAD, etc.) to a target server and measures the **round-trip time (RTT)** for each response — including the full TCP connect, HTTP send, and response receive cycle. It displays the **real HTTP status code** returned by the server, and supports both **plain HTTP** and **HTTPS** via OpenSSL.
 
-> ℹ️ HTTPTester works over **plain HTTP only** (no TLS/HTTPS support). It uses standard TCP sockets (`SOCK_STREAM`) — no raw sockets, no root privileges required.
+> ℹ️ HTTPTester uses standard TCP sockets (`SOCK_STREAM`) — no raw sockets, **no root privileges required**.
 
 ---
 
@@ -24,9 +25,10 @@ Instead of ICMP or TCP SYN packets, it sends real **HTTP/1.1 requests** (GET, PO
 - 📡 Sends real **HTTP/1.1 requests** (GET, POST, HEAD, or any method)
 - ⏱️ Measures **RTT per request** in milliseconds (full TCP connect → send → recv cycle)
 - ✅ Displays the **real HTTP status code** from the server response (`200`, `301`, `404`, `500`...)
+- 🔒 **HTTPS support** via OpenSSL (`-ssl` flag or auto-detection on port 443)
+- 🏠 **Virtual host support** (`-vh`) with automatic **SNI** injection for HTTPS
 - 📊 Per-request output: HTTP response code, sequence number, RTT
 - 📉 Final statistics on `^C` or end of count: transmitted, received, loss %, min/avg/max RTT
-- 🏠 **Virtual host support** (`-vh`) for testing name-based vhosts behind a shared IP
 - 📝 **POST data support** (`-dp`) with automatic `Content-Length` header
 - 🔧 Configurable: port, URI, method, count, interval
 
@@ -37,14 +39,15 @@ Instead of ICMP or TCP SYN packets, it sends real **HTTP/1.1 requests** (GET, PO
 ```bash
 ./httptester -d [ip destination]
      optional :
-         -p  [port]          (default 80)
-         -i  [interval]      (default 1 second)
-         -m  [METHOD]        (default GET)
-         -u  [uri]           (default /)
-         -vh [vhost]
-         -c  [count]         (default 4)
-         -dp [PostData HTTP]
-         -h  display this help.
+         -p   [port]          (default 80)
+         -i   [interval]      (default 1 second)
+         -m   [METHOD]        (default GET)
+         -u   [uri]           (default /)
+         -vh  [vhost]
+         -c   [count]         (default 4)
+         -dp  [PostData HTTP]
+         -ssl                 (force HTTPS, auto-enabled if port 443)
+         -h   display this help.
 ```
 
 ### Options
@@ -55,30 +58,27 @@ Instead of ICMP or TCP SYN packets, it sends real **HTTP/1.1 requests** (GET, PO
 | `-p` | Target TCP port | `80` |
 | `-m` | HTTP method (`GET`, `POST`, `HEAD`, ...) | `GET` |
 | `-u` | Request URI | `/` |
-| `-vh` | Virtual host (`Host:` header value) | Destination IP |
-| `-c` | Number of requests to send (`-1` = unlimited) | `4` |
+| `-vh` | Virtual host (`Host:` header + SNI for HTTPS) | Destination IP |
+| `-c` | Number of requests (`-1` = unlimited) | `4` |
 | `-i` | Interval between requests in seconds (float) | `1` |
 | `-dp` | POST body data (requires `-m POST`) | — |
+| `-ssl` | Force HTTPS/TLS (auto-enabled if port is `443`) | disabled |
 | `-h` | Display usage | — |
 
 ---
 
 ## 💡 Examples
 
-### Basic GET request
+### Basic HTTP GET
 
 ```bash
-./httptester -d 188.165.76.5
-```
-
-### GET with virtual host
-
-```bash
-./httptester -d 188.165.76.5 -p 80 -m "GET" -vh "tybbow.com"
+./httptester -d 188.165.76.5 -vh "tybbow.com"
 ```
 
 **Output:**
 ```
+[+] Mode: HTTP  (port 80)
+
 from (188.165.76.5): response: (200) http_seq=1 time=17.32 ms
 from (188.165.76.5): response: (200) http_seq=2 time=16.35 ms
 from (188.165.76.5): response: (200) http_seq=3 time=20.73 ms
@@ -89,7 +89,27 @@ from (188.165.76.5): response: (200) http_seq=4 time=16.64 ms
 rtt min/avg/max = 16.35/17.76/20.73 ms
 ```
 
-### Catching a redirect
+### HTTPS via flag `-ssl`
+
+```bash
+./httptester -d 188.165.76.5 -p 443 -ssl -vh "tybbow.com"
+```
+
+### HTTPS auto-detection (port 443 suffit)
+
+```bash
+./httptester -d 188.165.76.5 -p 443 -vh "tybbow.com"
+```
+
+**Output:**
+```
+[+] Mode: HTTPS (port 443)
+
+from (188.165.76.5): response: (200) http_seq=1 time=21.10 ms
+...
+```
+
+### Détecter une redirection HTTP → HTTPS
 
 ```bash
 ./httptester -d 188.165.76.5 -u "/old-page"
@@ -97,16 +117,15 @@ rtt min/avg/max = 16.35/17.76/20.73 ms
 
 ```
 from (188.165.76.5): response: (301) http_seq=1 time=15.10 ms
-from (188.165.76.5): response: (301) http_seq=2 time=14.87 ms
 ```
 
-### POST request with data
+### POST avec données
 
 ```bash
 ./httptester -d 192.168.1.10 -p 8080 -m "POST" -u "/api/login" -dp "user=admin&pass=1234" -c 10
 ```
 
-### Probe a health endpoint continuously
+### Probe continu sur un endpoint de santé
 
 ```bash
 ./httptester -d 10.0.0.1 -u "/health" -i 0.5 -c -1
@@ -116,123 +135,148 @@ from (188.165.76.5): response: (301) http_seq=2 time=14.87 ms
 
 ## 🛠️ Build
 
-### Prerequisites
+### Prérequis
 
-- GCC or Clang
-- Linux or macOS
+- GCC ou Clang
+- Linux ou macOS
 - `make`
+- **libssl-dev** (OpenSSL)
 
-> No root required — HTTPTester uses standard `SOCK_STREAM` TCP sockets.
+```bash
+# Debian / Ubuntu
+sudo apt install libssl-dev
 
-### Compile
+# macOS
+brew install openssl
+```
+
+> Aucun accès root requis — HTTPTester utilise des sockets TCP standards (`SOCK_STREAM`).
+
+### Compiler
 
 ```bash
 make
 ```
 
-### Clean
+### Nettoyer
 
 ```bash
-make clean
+make clean    # supprime les .o
+make fclean   # supprime les .o + le binaire
+make re       # recompile tout
 ```
 
-### Run
+### Lancer
 
 ```bash
-./httptester -d  -vh 
+./httptester -d  [-p ] [-ssl] [-vh ]
 ```
 
 ---
 
-## 🗂️ Project Structure
+## 🗂️ Structure du projet
 
 ```
 HttpTester/
 ├── includes/
-│   └── httptester.h    # Structs (t_opts, t_stats), color macros, function prototypes
+│   └── httptester.h    # Structs (t_opts, t_stats), macros couleur, prototypes
 ├── srcs/
-│   ├── httptester.c    # Entry point: init, main loop (launch), SIGINT setup
-│   ├── options.c       # Option parsing (getOpts), request builder (createRequest), checkOpts
-│   ├── http.c          # TCP connect → HTTP send → recv → parse status code → close
-│   ├── functions.c     # RTT calculation (time_diff), stats update, intlen helper
-│   ├── handle.c        # SIGINT handler: prints final statistics and exits
-│   └── usage.c         # Displays help message
-└── Makefile
+│   ├── httptester.c    # Point d'entrée : init, boucle principale, routing HTTP/HTTPS
+│   ├── options.c       # Parsing des options, construction de la requête, checkOpts
+│   ├── http.c          # Requête HTTP plain : connect → send → recv → parse status
+│   ├── https.c         # Requête HTTPS : idem + handshake TLS OpenSSL + SNI
+│   ├── functions.c     # time_diff(), statistics(), intlen()
+│   ├── handle.c        # Gestionnaire SIGINT : affiche les stats finales
+│   └── usage.c         # Affichage de l'aide
+└── Makefile            # -lssl -lcrypto en fin de commande de link
 ```
 
 ---
 
-## 🧠 How It Works
+## 🧠 Fonctionnement
 
-HTTPTester uses a simple **single-threaded sequential** approach — one request at a time, no raw sockets needed.
+### Mode HTTP (`http.c`)
 
 ```
-For each probe:
-
-  gettimeofday(&before)
-       │
-       ▼
-  socket() → connect(dst:port)
-       │
-       ▼
-  send(HTTP request)
-  ┌─────────────────────────────────────────┐
-  │  METHOD URI HTTP/1.1\r\n                │
-  │  Host: <vhost or dst>\r\n               │
-  │  [Content-Length: N\r\n]  (POST only)   │
-  │  \r\n                                   │
-  │  [postdata]               (POST only)   │
-  └─────────────────────────────────────────┘
-       │
-       ▼
-  recv(server_reply, 512 bytes)
-       │
-       ▼
-  parse_status_code()
-  "HTTP/1.1 200 OK" → strchr(' ') → atoi() → 200
-       │
-       ▼
-  close(socket)
-       │
-       ▼
-  gettimeofday(&after)
-  RTT = after - before (ms)
+gettimeofday(&before)
+    │
+    ▼
+socket() → connect(dst:port)
+    │
+    ▼
+send(requête HTTP/1.1)
+    │
+    ▼
+recv(512 bytes) → parse_status_code()
+"HTTP/1.1 200 OK" → strchr(' ') → atoi() → 200
+    │
+    ▼
+close(socket)
+    │
+    ▼
+gettimeofday(&after) → RTT = after - before (ms)
 ```
 
-### HTTP Status Code Parsing (`http.c`)
+### Mode HTTPS (`https.c`)
 
-The server response always starts with `HTTP/1.x NNN Reason`. `parse_status_code()` locates the first space with `strchr()`, reads the 3-digit code with `atoi()`, and validates it is in the `100–599` range. A return value of `0` indicates a connection failure or malformed response.
+```
+gettimeofday(&before)
+    │
+    ▼
+socket() → connect(dst:port)
+    │
+    ▼
+SSL_CTX_new(TLS_client_method())
+SSL_new(ctx) → SSL_set_fd(ssl, socket)
+SSL_set_tlsext_host_name()   ← SNI (vhost ou IP)
+SSL_connect()                ← Handshake TLS
+    │
+    ▼
+SSL_write(requête HTTP/1.1)
+    │
+    ▼
+SSL_read(512 bytes) → parse_status_code()
+    │
+    ▼
+SSL_shutdown() → SSL_free() → close() → SSL_CTX_free()
+    │
+    ▼
+gettimeofday(&after) → RTT = after - before (ms)
+```
+
+### Routing HTTP / HTTPS (`httptester.c`)
+
+```c
+if (opts->ssl)
+    code = request_ssl(opts);   // https.c
+else
+    code = request(opts);       // http.c
+```
+
+Le flag `ssl` est activé par `-ssl` **ou** automatiquement si le port est `443`.
 
 ---
 
-## 📐 HTTP Status Codes Reference
+## 📐 Codes HTTP de référence
 
-| Code | Meaning | Example cause |
-|------|---------|---------------|
-| `200` | OK | Normal response |
-| `301` / `302` | Redirect | Wrong URI or HTTP→HTTPS redirect |
-| `400` | Bad Request | Malformed request |
-| `403` | Forbidden | Access denied |
-| `404` | Not Found | Wrong URI |
-| `500` | Internal Server Error | Server-side crash |
-| `0` | No response | Connection refused or timeout |
-
----
-
-## ⚠️ Known Limitations
-
-- **HTTP only** — no TLS/HTTPS support. For HTTPS targets, consider using `curl` or `openssl s_client`.
-- **No DNS resolution** — destination must be specified as an IP address.
-- **512-byte receive buffer** — only the beginning of the HTTP response is captured, sufficient for status code extraction and RTT measurement.
+| Code | Signification | Cause fréquente |
+|------|--------------|-----------------|
+| `200` | OK | Réponse normale |
+| `301` / `302` | Redirection | Mauvais URI ou HTTP → HTTPS |
+| `400` | Bad Request | Requête malformée |
+| `403` | Forbidden | Accès refusé |
+| `404` | Not Found | URI inexistant |
+| `500` | Internal Server Error | Crash côté serveur |
+| `0` | Pas de réponse | Connexion refusée, timeout ou erreur SSL |
 
 ---
 
-## 👤 Author
+## 👤 Auteur
 
-**Tybbow**  
+**Tybbow**
 
 ---
 
-## 📄 License
+## 📄 Licence
 
-This project is licensed under the [MIT License](LICENSE).
+Ce projet est sous licence [MIT](LICENSE).
